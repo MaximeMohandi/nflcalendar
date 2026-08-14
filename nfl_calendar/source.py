@@ -25,8 +25,9 @@ class SourceError(RuntimeError):
     pass
 
 
+NFL_EVENT_START = re.compile(r'"homeTeam":')
 NFL_EVENT = re.compile(
-    r'"homeTeam":\{.*?"fullName":"(?P<home>[^"]+)"\},"awayTeam":\{.*?"fullName":"(?P<away>[^"]+)"\}.*?'
+    r'"homeTeam":.*?"fullName":"(?P<home>[^"]+)".*?"awayTeam":.*?"fullName":"(?P<away>[^"]+)".*?'
     r'"time":"(?P<time>[^"]+)".*?"venue":\{.*?"name":"(?P<stadium>[^"]+)".*?"city":"(?P<city>[^"]+)".*?'
     r'"season":(?P<season>\d+),"seasonType":"(?P<phase>[^"]+)","status":"(?P<status>[^"]+)","week":(?P<week>\d+).*?'
     r'"externalIds":\[(?P<ids>.*?)\]',
@@ -107,15 +108,18 @@ def parse_nfl_schedule_page(text: str, season: int) -> list[Game]:
     """Parse NFL.com's serialized Next.js schedule payload, isolated from the rest of the app."""
     payload = html.unescape(text).replace(r'\"', '"')
     games = []
-    for match in NFL_EVENT.finditer(payload):
-        if int(match["season"]) != season:
+    starts = list(NFL_EVENT_START.finditer(payload))
+    for index, match in enumerate(starts):
+        event = payload[match.start():starts[index + 1].start() if index + 1 < len(starts) else len(payload)]
+        parsed = NFL_EVENT.search(event)
+        if not parsed or int(parsed["season"]) != season:
             continue
-        game_id = GSIS_ID.search(match["ids"])
+        game_id = GSIS_ID.search(parsed["ids"])
         if not game_id:
             continue
         games.append(Game(
-            game_id=game_id["id"], start_time=_timestamp(match["time"]), away_team=match["away"], home_team=match["home"],
-            status=match["status"], stadium=match["stadium"], city=match["city"], week=match["week"], phase=match["phase"],
+            game_id=game_id["id"], start_time=_timestamp(parsed["time"]), away_team=parsed["away"], home_team=parsed["home"],
+            status=parsed["status"], stadium=parsed["stadium"], city=parsed["city"], week=parsed["week"], phase=parsed["phase"],
         ))
     return games
 
