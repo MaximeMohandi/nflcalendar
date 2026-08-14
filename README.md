@@ -50,3 +50,4 @@ Le CLI valide les données et l’ICS, écrit via fichier temporaire + `fsync` +
 `pytest` couvre le parsing, UID, TBD, priorité de `DTEND`, ICS, écriture atomique, changements, erreurs HTTP/timeout et serveur HTTP. Les erreurs réseau, CSV vide ou invalide conservent le dernier calendrier servi.
 
 La collection [Postman](postman/nflcalendar.postman_collection.json) vérifie l’URL publiée par NGINX Proxy Manager.
+# nflcalendar
