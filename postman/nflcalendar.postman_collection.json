@@ -1,0 +1,6 @@
+{
+  "info": {"name": "nflcalendar", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [
+    {"name": "Published calendar", "request": {"method": "GET", "url": "{{baseUrl}}/nfl.ics"}, "event": [{"listen": "test", "script": {"exec": ["pm.test('200', () => pm.response.to.have.status(200));", "pm.test('calendar', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/calendar'));", "['BEGIN:VCALENDAR', 'UID:', 'DTSTART:', 'DTEND:'].forEach(value => pm.test(value, () => pm.expect(pm.response.text()).to.include(value))); "]}}]}
+  ]
+}

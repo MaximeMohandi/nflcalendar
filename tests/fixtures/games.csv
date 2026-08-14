@@ -1,0 +1,5 @@
+game_id,season,game_type,week,gameday,gametime,away_team,home_team,stadium,location,status,start_time,end_time,duration
+2026091400,2026,REG,1,2026-09-13,20:20,DAL,PHI,Lincoln Financial Field,Philadelphia,scheduled,2026-09-14T00:20:00Z,,
+2026091401,2026,REG,1,2026-09-13,20:20,NYJ,BUF,Highmark Stadium,Orchard Park,scheduled,2026-09-14T00:20:00Z,2026-09-14T03:42:00Z,
+2026091402,2026,REG,1,2026-09-13,20:20,KC,LAC,SoFi Stadium,Inglewood,scheduled,2026-09-14T00:20:00Z,,201
+2026091403,2026,REG,1,2026-09-13,TBD,GB,CHI,Soldier Field,Chicago,scheduled,,,
