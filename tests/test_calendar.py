@@ -7,7 +7,7 @@ import requests
 
 from nfl_calendar.calendar import event_end, make_calendar, uid, validate_games, write_calendar
 from nfl_calendar.models import Game
-from nfl_calendar.source import SourceError, download_games, parse_games
+from nfl_calendar.source import SourceError, download_games, parse_games, parse_nfl_schedule_page
 from nfl_calendar.server import application
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "games.csv").read_text()
@@ -113,3 +113,12 @@ def test_http_server_serves_published_calendar(tmp_path):
     assert response[0] == "200 OK"
     assert dict(response[1])["Content-Type"].startswith("text/calendar")
     assert b"BEGIN:VCALENDAR" in body
+
+
+def test_official_nfl_schedule_payload_is_parsed():
+    page = ('"homeTeam":{"fullName":"Cincinnati Bengals"},"awayTeam":{"fullName":"Detroit Lions"},'
+            '"time":"2026-08-13T23:00:00Z","venue":{"name":"Paycor Stadium","city":"Cincinnati"},'
+            '"season":2026,"seasonType":"PRE","status":"SCHEDULED","week":1,'
+            '"externalIds":[{"source":"gsis","id":"60451"}]')
+    game = parse_nfl_schedule_page(page, 2026)[0]
+    assert (game.game_id, game.phase, game.start_time) == ("60451", "PRE", datetime(2026, 8, 13, 23, tzinfo=timezone.utc))

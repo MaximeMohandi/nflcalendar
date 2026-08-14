@@ -1,9 +1,11 @@
-"""The only module aware of nflverse's remote CSV format."""
+"""The only module aware of the remote NFL.com and nflverse formats."""
 from __future__ import annotations
 
 import csv
+import html
 import io
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -15,11 +17,21 @@ from .models import Game
 
 LOG = logging.getLogger(__name__)
 NFLVERSE_GAMES_URL = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv"
+NFL_SCHEDULE_URL = "https://www.nfl.com/schedules"
 HEADERS = {"User-Agent": "nfl-calendar/1.0 (+https://calendar.mondomaine.fr)"}
 
 
 class SourceError(RuntimeError):
     pass
+
+
+NFL_EVENT = re.compile(
+    r'"homeTeam":\{.*?"fullName":"(?P<home>[^"]+)"\},"awayTeam":\{.*?"fullName":"(?P<away>[^"]+)"\}.*?'
+    r'"time":"(?P<time>[^"]+)".*?"venue":\{.*?"name":"(?P<stadium>[^"]+)".*?"city":"(?P<city>[^"]+)".*?'
+    r'"season":(?P<season>\d+),"seasonType":"(?P<phase>[^"]+)","status":"(?P<status>[^"]+)","week":(?P<week>\d+).*?'
+    r'"externalIds":\[(?P<ids>.*?)\]',
+)
+GSIS_ID = re.compile(r'"source":"gsis","id":"(?P<id>[^"]+)"')
 
 
 def _timestamp(value: str) -> datetime:
@@ -91,13 +103,53 @@ def _session() -> requests.Session:
     return session
 
 
+def parse_nfl_schedule_page(text: str, season: int) -> list[Game]:
+    """Parse NFL.com's serialized Next.js schedule payload, isolated from the rest of the app."""
+    payload = html.unescape(text).replace(r'\"', '"')
+    games = []
+    for match in NFL_EVENT.finditer(payload):
+        if int(match["season"]) != season:
+            continue
+        game_id = GSIS_ID.search(match["ids"])
+        if not game_id:
+            continue
+        games.append(Game(
+            game_id=game_id["id"], start_time=_timestamp(match["time"]), away_team=match["away"], home_team=match["home"],
+            status=match["status"], stadium=match["stadium"], city=match["city"], week=match["week"], phase=match["phase"],
+        ))
+    return games
+
+
+def download_nfl_schedule(season: int, session: requests.Session) -> list[Game]:
+    """Fetch NFL.com's weekly pages; their payload contains all published phases."""
+    try:
+        index = session.get(NFL_SCHEDULE_URL, timeout=15)
+        index.raise_for_status()
+        slugs = sorted(set(re.findall(r'/schedules/' + str(season) + r'/by-week/([a-z0-9-]+)', html.unescape(index.text))))
+        pages = [session.get(f"{NFL_SCHEDULE_URL}/{season}/by-week/{slug}", timeout=15) for slug in slugs]
+        for page in pages:
+            page.raise_for_status()
+    except requests.RequestException as error:
+        raise SourceError(f"NFL.com schedule download failed: {error}") from error
+    games = {game.game_id: game for page in pages for game in parse_nfl_schedule_page(page.text, season)}
+    if not games:
+        raise SourceError("NFL.com schedule contains no games")
+    LOG.info("Found %d official NFL games", len(games))
+    return list(games.values())
+
+
 def download_games(season: int, url: str = NFLVERSE_GAMES_URL, timeout: float = 15, session: requests.Session | None = None) -> list[Game]:
     LOG.info("Downloading NFL schedule")
+    client = session or _session()
     try:
-        response = (session or _session()).get(url, timeout=timeout)
+        return download_nfl_schedule(season, client)
+    except SourceError as error:
+        LOG.warning("NFL.com schedule unavailable; using nflverse fallback: %s", error)
+    try:
+        response = client.get(url, timeout=timeout)
         response.raise_for_status()
     except requests.RequestException as error:
         raise SourceError(f"NFL schedule download failed: {error}") from error
     games = parse_games(response.text, season)
-    LOG.info("Found %d games", len(games))
+    LOG.info("Found %d nflverse fallback games", len(games))
     return games

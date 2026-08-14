@@ -1,6 +1,6 @@
 # NFL Calendar
 
-Self-contained container that downloads the nflverse schedule, produces `nfl.ics` every six hours, and serves it through NGINX Proxy Manager. It does not contact Google or any third-party account.
+Self-contained container that downloads the NFL.com schedule, produces `nfl.ics` every six hours, and serves it through NGINX Proxy Manager. It does not contact Google or any third-party account.
 
 ```text
 nflverse games.csv → Python container → /nfl.ics → NGINX Proxy Manager → Google Calendar
@@ -8,11 +8,11 @@ nflverse games.csv → Python container → /nfl.ics → NGINX Proxy Manager →
 
 ## Source and limitations
 
-The free source is `https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv`. It is a structured, versioned CSV with no HTML to scrape, but **it is not an official NFL API**. All dependency on its format is isolated in [source.py](nfl_calendar/source.py). The CSV provides `game_id`, season, phase, week, teams, venue, stadium, and kickoff time.
+The primary source is NFL.com's public Next.js schedule payload, which supplies all published Hall of Fame, preseason, regular-season, and postseason games. It is an undocumented frontend format and may change. `https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv` is the free fallback when NFL.com is unavailable. All remote-format handling is isolated in [source.py](nfl_calendar/source.py).
 
 A timezone-aware `start_time` is preserved as the same UTC instant. Otherwise, `gametime` is interpreted in nflverse's documented timezone (`America/New_York`), with no stadium, city, or team mapping. A `TBD` game is omitted until an usable kickoff is published.
 
-`DTEND` always prioritizes `end_time`, then `duration`, then `EVENT_DURATION_FALLBACK_MINUTES=210`. nflverse currently does not provide official end times, which is a known limitation; no game-specific estimate is made. A future official NFL source only needs to be added in `source.py`.
+`DTEND` always prioritizes `end_time`, then `duration`, then `EVENT_DURATION_FALLBACK_MINUTES=210`. The current NFL.com payload does not provide official end times, which is a known limitation; no game-specific estimate is made. If NFL.com's undocumented payload changes or is unavailable, the service falls back to nflverse.
 
 ## Docker and NGINX Proxy Manager
 
