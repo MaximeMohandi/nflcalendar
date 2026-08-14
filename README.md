@@ -18,15 +18,15 @@ A timezone-aware `start_time` is preserved as the same UTC instant. Otherwise, `
 
 ```bash
 mkdir -p data
-NFL_SEASON=2026 docker compose up -d --build
+PUID=$(id -u) PGID=$(id -g) NFL_SEASON=2026 docker compose up -d --build
 ```
 
-The container runs as non-root, keeps the last valid calendar in `./data/nfl.ics`, and refreshes every six hours (`SYNC_INTERVAL_SECONDS=21600`). It exposes:
+The container runs as the non-root host UID/GID supplied through `PUID` and `PGID`, so it can write the bind-mounted `./data` directory without becoming root. It keeps the last valid calendar in `./data/nfl.ics` and refreshes every six hours (`SYNC_INTERVAL_SECONDS=21600`). It exposes:
 
 - `GET /nfl.ics` — `text/calendar; charset=utf-8`, cached for 5 minutes;
 - `GET /healthz` — returns 200 once a valid calendar is available.
 
-In NGINX Proxy Manager, create a Proxy Host for `calendar.mondomaine.fr` that points to this container on port `8000`, then use `https://calendar.mondomaine.fr/nfl.ics`. If NPM is on a separate Docker network, attach both containers to a shared Docker network; do not add an nginx configuration to this project.
+In NGINX Proxy Manager, create a Proxy Host for `calendar.mondomaine.fr` with **Forward Scheme: `http`**, host `nfl-calendar` (when it shares a Docker network with NPM), and port `8000`. Configure HTTPS only in NPM's **SSL** tab for the public side, then use `https://calendar.mondomaine.fr/nfl.ics`. Sending HTTPS directly to port 8000 is incorrect and produces TLS/HTTP 400 logs. If NPM is on a separate Docker network, attach both containers to a shared Docker network; do not add an nginx configuration to this project.
 
 In Google Calendar: **Other calendars → + → From URL → `https://calendar.mondomaine.fr/nfl.ics`**. Google chooses its own refresh interval.
 
