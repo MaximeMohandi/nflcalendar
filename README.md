@@ -1,36 +1,36 @@
 # NFL Calendar
 
-Conteneur autonome qui télécharge le calendrier nflverse, produit `nfl.ics` toutes les six heures et le sert à NGINX Proxy Manager. Il ne contacte ni Google ni un compte tiers.
+Self-contained container that downloads the nflverse schedule, produces `nfl.ics` every six hours, and serves it through NGINX Proxy Manager. It does not contact Google or any third-party account.
 
 ```text
-nflverse games.csv → conteneur Python → /nfl.ics → NGINX Proxy Manager → Google Calendar
+nflverse games.csv → Python container → /nfl.ics → NGINX Proxy Manager → Google Calendar
 ```
 
-## Source et limites
+## Source and limitations
 
-La source gratuite est `https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv`. C’est un CSV structuré/versionné sans HTML à parser, mais **ce n’est pas une API NFL officielle**. Toute dépendance à son format est isolée dans [source.py](nfl_calendar/source.py). Le CSV apporte `game_id`, saison, phase, semaine, équipes, lieu, stade et kickoff.
+The free source is `https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv`. It is a structured, versioned CSV with no HTML to scrape, but **it is not an official NFL API**. All dependency on its format is isolated in [source.py](nfl_calendar/source.py). The CSV provides `game_id`, season, phase, week, teams, venue, stadium, and kickoff time.
 
-Un `start_time` timezone-aware est conservé comme le même instant UTC. Sinon `gametime` est interprété dans le fuseau nflverse documenté (`America/New_York`), sans mapping stade, ville ou équipe. Un match `TBD` est omis jusqu’à ce qu’un kickoff exploitable soit publié.
+A timezone-aware `start_time` is preserved as the same UTC instant. Otherwise, `gametime` is interpreted in nflverse's documented timezone (`America/New_York`), with no stadium, city, or team mapping. A `TBD` game is omitted until an usable kickoff is published.
 
-`DTEND` respecte toujours : `end_time`, puis `duration`, puis le fallback `EVENT_DURATION_FALLBACK_MINUTES=210`. nflverse ne fournit actuellement pas de fin officielle : c’est donc une limite connue, sans estimation spécifique par match. Une source NFL officielle future s’ajoute seulement dans `source.py`.
+`DTEND` always prioritizes `end_time`, then `duration`, then `EVENT_DURATION_FALLBACK_MINUTES=210`. nflverse currently does not provide official end times, which is a known limitation; no game-specific estimate is made. A future official NFL source only needs to be added in `source.py`.
 
-## Docker et NGINX Proxy Manager
+## Docker and NGINX Proxy Manager
 
 ```bash
 mkdir -p data
 NFL_SEASON=2026 docker compose up -d --build
 ```
 
-Le conteneur ne tourne pas en root, conserve le dernier fichier valide dans `./data/nfl.ics` et se synchronise toutes les six heures (`SYNC_INTERVAL_SECONDS=21600`). Il expose :
+The container runs as non-root, keeps the last valid calendar in `./data/nfl.ics`, and refreshes every six hours (`SYNC_INTERVAL_SECONDS=21600`). It exposes:
 
-- `GET /nfl.ics` — `text/calendar; charset=utf-8`, cache 5 min ;
-- `GET /healthz` — 200 dès qu’un calendrier valide est disponible.
+- `GET /nfl.ics` — `text/calendar; charset=utf-8`, cached for 5 minutes;
+- `GET /healthz` — returns 200 once a valid calendar is available.
 
-Dans NGINX Proxy Manager, créez un *Proxy Host* pour `calendar.mondomaine.fr` vers ce conteneur, port `8000`, puis utilisez `https://calendar.mondomaine.fr/nfl.ics`. Si NPM est sur un autre réseau Docker, connectez les deux conteneurs à un réseau Docker commun ; n’ajoutez pas de configuration nginx au projet.
+In NGINX Proxy Manager, create a Proxy Host for `calendar.mondomaine.fr` that points to this container on port `8000`, then use `https://calendar.mondomaine.fr/nfl.ics`. If NPM is on a separate Docker network, attach both containers to a shared Docker network; do not add an nginx configuration to this project.
 
-Google Calendar : **Autres agendas → + → À partir de l’URL → `https://calendar.mondomaine.fr/nfl.ics`**. Google choisit lui-même sa fréquence de rafraîchissement.
+In Google Calendar: **Other calendars → + → From URL → `https://calendar.mondomaine.fr/nfl.ics`**. Google chooses its own refresh interval.
 
-## Exécution locale
+## Local use
 
 ```bash
 python3 -m venv .venv
@@ -41,13 +41,12 @@ python -m nfl_calendar.cli --season 2026 --output output/nfl.ics
 pytest
 ```
 
-Variables : `NFL_SEASON`, `OUTPUT_FILE`, `EVENT_DURATION_FALLBACK_MINUTES`, `NFLVERSE_URL`, `CALENDAR_DOMAIN`, `LOG_LEVEL`, `SYNC_INTERVAL_SECONDS` et `PORT`.
+Environment variables: `NFL_SEASON`, `OUTPUT_FILE`, `EVENT_DURATION_FALLBACK_MINUTES`, `NFLVERSE_URL`, `CALENDAR_DOMAIN`, `LOG_LEVEL`, `SYNC_INTERVAL_SECONDS`, and `PORT`.
 
-Le CLI valide les données et l’ICS, écrit via fichier temporaire + `fsync` + remplacement atomique, conserve l’ancien fichier en cas d’erreur et ne réécrit pas un contenu identique. L’UID est toujours `nfl-<game_id>@<CALENDAR_DOMAIN>` : un changement de date, heure, stade ou `DTEND` met à jour le même événement.
+The CLI validates the data and ICS, writes with a temporary file + `fsync` + atomic replacement, keeps the old file on errors, and skips identical output. The UID is always `nfl-<game_id>@<CALENDAR_DOMAIN>`: a date, kickoff, stadium, or `DTEND` change updates the existing event.
 
-## Tests et dépannage
+## Tests and troubleshooting
 
-`pytest` couvre le parsing, UID, TBD, priorité de `DTEND`, ICS, écriture atomique, changements, erreurs HTTP/timeout et serveur HTTP. Les erreurs réseau, CSV vide ou invalide conservent le dernier calendrier servi.
+`pytest` covers parsing, UIDs, TBD games, `DTEND` priority, ICS generation, atomic writes, changes, HTTP errors/timeouts, and the embedded HTTP server. Network failures and empty or invalid CSV responses keep the last served calendar.
 
-La collection [Postman](postman/nflcalendar.postman_collection.json) vérifie l’URL publiée par NGINX Proxy Manager.
-# nflcalendar
+The [Postman collection](postman/nflcalendar.postman_collection.json) verifies the URL published by NGINX Proxy Manager.
