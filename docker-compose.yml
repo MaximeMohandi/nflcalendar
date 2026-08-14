@@ -1,13 +1,10 @@
 services:
   nfl-calendar:
     build: .
-    user: "${PUID:-1000}:${PGID:-1000}"
-    volumes:
-      - ./data:/data
     ports:
       - "8000:8000"
     environment:
       NFL_SEASON: "${NFL_SEASON:-2026}"
-      OUTPUT_FILE: /data/nfl.ics
+      OUTPUT_FILE: /tmp/nfl.ics
       EVENT_DURATION_FALLBACK_MINUTES: "${EVENT_DURATION_FALLBACK_MINUTES:-210}"
       SYNC_INTERVAL_SECONDS: "${SYNC_INTERVAL_SECONDS:-21600}"

@@ -17,11 +17,10 @@ A timezone-aware `start_time` is preserved as the same UTC instant. Otherwise, `
 ## Docker and NGINX Proxy Manager
 
 ```bash
-mkdir -p data
-PUID=$(id -u) PGID=$(id -g) NFL_SEASON=2026 docker compose up -d --build
+NFL_SEASON=2026 docker compose up -d --build
 ```
 
-The container runs as the non-root host UID/GID supplied through `PUID` and `PGID`, so it can write the bind-mounted `./data` directory without becoming root. It keeps the last valid calendar in `./data/nfl.ics` and refreshes every six hours (`SYNC_INTERVAL_SECONDS=21600`). It exposes:
+The container runs as its built-in non-root user. It stores the generated calendar in `/tmp/nfl.ics` and refreshes every six hours (`SYNC_INTERVAL_SECONDS=21600`). The file is intentionally not persisted: after a container restart, `/healthz` returns 503 until the next successful nflverse download. It exposes:
 
 - `GET /nfl.ics` — `text/calendar; charset=utf-8`, cached for 5 minutes;
 - `GET /healthz` — returns 200 once a valid calendar is available.

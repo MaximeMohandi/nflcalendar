@@ -31,7 +31,7 @@ def application(output: Path):
 def main() -> None:
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
     season = int(os.environ["NFL_SEASON"])
-    output = Path(os.getenv("OUTPUT_FILE", "/data/nfl.ics"))
+    output = Path(os.getenv("OUTPUT_FILE", "/tmp/nfl.ics"))
     fallback = int(os.getenv("EVENT_DURATION_FALLBACK_MINUTES", "210"))
     domain = os.getenv("CALENDAR_DOMAIN", "calendar.mondomaine.fr")
     source_url = os.getenv("NFLVERSE_URL", "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv")
